@@ -34,7 +34,7 @@ async function joinGame(){
     //let payload={cmd:"runTo",playerId:"1",sqn:"-1",action:{cmd:"runTo",position:{x:100,y:100}}}
     //let payload={cmd:"throw",playerId:"1",sqn:"-1",action:{cmd:"runTo",position:{x:100,y:100}}}
     //let payload={cmd:"poll",playerId:1}  // returns all queued items (for playerId) - which includes Joined players
-                
+                 
     //gameId:string
     //playerId:string
     //sqn:number   //sequence number    
