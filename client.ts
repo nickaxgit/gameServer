@@ -8,25 +8,32 @@ async function createGame(){
 
     let cmd={cmd:"createGame",playerName:playerName}
     
-    let msgs:object = await fetchObject(endpoint,cmd)    
+    let msgs = await fetchObject(endpoint,cmd)
+    
+    processMsgs(msgs)
+    
     gameId=msgs[0].gameId;  //we now know which game WE have joined (the creator)
     (<HTMLInputElement>document.getElementById("gameToShare")).value=gameId.toString()    
-    setTimeout(poll,1000)           
+    setInterval(poll,1000)           
 }
 
 async function joinGame(){
 
-    let playerName=(<HTMLInputElement>document.getElementById("playerName")).value
+    playerName=(<HTMLInputElement>document.getElementById("playerName")).value
     let gameToJoin=(<HTMLInputElement>document.getElementById("gameToJoin")).value
     let payload={cmd:"joinGame",playerName:playerName,gameId:gameToJoin} //will return (assign to you)a player ID -
     let msgs=await fetchObject(endpoint,payload)
-    
+ 
+    processMsgs(msgs) //just to display them
+
     if (msgs[0].gameId==-1){
         alert("No such game")
     }
     else{        
         gameId=msgs[0].gameId        
-        setTimeout(poll,1000) //start polling for incomming data
+        console.log("Joined game")
+    
+        setInterval(poll,1000) //start polling for incomming data
     }           
 
     //let payload={gameId:"1",playerId:"1",sqn:"-1",action:{cmd:"runTo",position:{x:100,y:100}}}
@@ -34,7 +41,7 @@ async function joinGame(){
     //let payload={cmd:"runTo",playerId:"1",sqn:"-1",action:{cmd:"runTo",position:{x:100,y:100}}}
     //let payload={cmd:"throw",playerId:"1",sqn:"-1",action:{cmd:"runTo",position:{x:100,y:100}}}
     //let payload={cmd:"poll",playerId:1}  // returns all queued items (for playerId) - which includes Joined players
-                
+                 
     //gameId:string
     //playerId:string
     //sqn:number   //sequence number    
@@ -60,8 +67,13 @@ async function poll(){
 }
 
 function processMsgs(msgs:any[]){
+    
+    let rxd=document.getElementById("rxd")
     for (let i=0;i<msgs.length;i++){
         console.log(msgs[i].cmd)  //You will want to actually *do things* here .. like run players to points, and launch snowballs
+        let msg:HTMLParagraphElement=document.createElement("p")
+        msg.innerText=msgs[i].cmd
+        rxd.appendChild(msg)
     }  
 }
 
