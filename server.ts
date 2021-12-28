@@ -79,7 +79,10 @@ app.post("/*",(req,res)=>{
     //create a new player and add them to the requested game
     game.players[msg.playerName]= new Player(msg.playerName)    
     msg.cmd="playerJoined"
-    console.log(`${msg.playerName} joined game ${game.id}`) 
+    console.log(`${msg.playerName} joined game ${game.id}`)
+    
+    //queue a 'playerJoined' messages for every other player in the game - for sending to this player
+    
 
   }
   else if (msg.gameId==null){
