@@ -7,9 +7,12 @@ class Game{
   id:number =-1
   sqn:number = 0         //Every received message is assigend a sequence number .. for now there is no checking on the order but they *should* be processed in order (by clients)
   players:Record<string,Player>={} //each game has a set of players, indexed by (unique) player name
-  constructor(games:Record<number,Game>){
+  data:object  //store arbitrary game data, to be sent to players when they join (in our case, the type and position of all obstacles)
+
+  constructor(games:Record<number,Game>,data:object){
     do{
       this.id=Math.floor(Math.random()*10000)+1000    //make a random game ID
+      this.data=data
     }
     while (games.hasOwnProperty(this.id))  //keep looping until we find an unused ID (becuase there's a small chance of a dupe)    
     games[this.id]=this  //store the game we have constructed
@@ -27,7 +30,7 @@ class Player{
 
 export class Message{
   gameId:number
-  playerName:string
+  name:string
   sqn:number   //sequence number    
   cmd:string      //the 'command' is the action being performed
   params:object   //can be an empty object 
@@ -62,14 +65,17 @@ app.post("/*",(req,res)=>{
   let msg:Message=req.body //json() //body
   
   let game:Game
+  let player:Player
 
   if (msg.gameId){ game=games[msg.gameId]}
 
   if (msg.cmd =="createGame"){
-    game=new Game(games);       
-    
+    game=new Game(games,msg.params);           
     console.log(`Created game ${game.id}`)
-    game.players[msg.playerName]=(new Player(msg.playerName)) //place them in the games, players object  
+    
+    //move out (you should join the game you created)
+    player =new Player(msg.name)
+    game.players[msg.name]=player //place them in the games, players object  
     //alter the msg - for output in all the queues
     msg.cmd="playerJoined" 
     msg.gameId=game.id
@@ -77,14 +83,27 @@ app.post("/*",(req,res)=>{
   
   else if (msg.cmd=="joinGame"){
     //create a new player and add them to the requested game
-    game.players[msg.playerName]= new Player(msg.playerName)    
-    msg.cmd="playerJoined"
-    console.log(`${msg.playerName} joined game ${game.id}`)
+    player =new Player(msg.name)
     
-    //queue a 'playerJoined' messages for every other player in the game - for sending to this player
-    
+    //send the game setup data (whatever that is... in our case, obstacles)
+    player.q.push({gameId:game.id,name:"",cmd:"gameData",sqn:game.sqn,params:game.data})
+    game.sqn++
 
+    //queue a 'virtual' 'playerJoined' message 'from' every player already in the game - for sending to this (joining) player 
+    //(so we (the joining players) get to see all the players who have *already* joined)
+    for (let pn in game.players){
+      let op=game.players[pn] //other player      
+      player.q.push({cmd:"playerJoined",name:op.name,gameId:game.id,sqn:game.sqn,params:{}})
+      game.sqn ++ 
+    }
+
+    game.players[msg.name]= player
+    msg.cmd="playerJoined"
+    console.log(`${msg.name} joined game ${game.id}`)
+    
+    
   }
+
   else if (msg.gameId==null){
     console.log (`ERROR: received a ${msg.cmd||'null'} command with no gameId present (Only joinGame, and createGame can be called without a gameId`)
   }
@@ -102,19 +121,19 @@ app.post("/*",(req,res)=>{
   }
   
   //the response to posting up ANY message (inclding Poll) is the list of all pending items in YOUR q (which will include the action you just posted)
-  if (game.players.hasOwnProperty(msg.playerName)){
+  if (game.players.hasOwnProperty(msg.name)){
     
     //note q *can* be empty if we are polling and there is nothing for us
-    if (game.players[msg.playerName].q.length>0){
-      res.json (game.players[msg.playerName].q) 
+    if (game.players[msg.name].q.length>0){
+      res.json (game.players[msg.name].q) 
     }
     else{
       res.json({}) //send an empty object if the their queue is empty (sending an empty array casues 'unexpected end of response' clientside)
     }
-    game.players[msg.playerName].q =[] //empty their queue, once it has been sent (note we can't empty 'q'.. that jsut reassigns the object reference and leavers the original unaffected (ask me how i know))
+    game.players[msg.name].q =[] //empty their queue, once it has been sent (note we can't empty 'q'.. that jsut reassigns the object reference and leavers the original unaffected (ask me how i know))
   }
   else{
-    console.log(`game ${game.id} has no player '${msg.playerName}'`)
+    console.log(`game ${game.id} has no player '${msg.name}'`)
   }
 
   res.status(200)  //sendStatus(200)
