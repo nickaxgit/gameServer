@@ -4,12 +4,13 @@ exports.Message = void 0;
 //Each player sends a 'message' every time an input is made (completed) - each input is asigned a SQN
 //every 1/10th of a second all players poll for all outstanding messages
 var Game = /** @class */ (function () {
-    function Game(games) {
+    function Game(games, data) {
         this.id = -1;
         this.sqn = 0; //Every received message is assigend a sequence number .. for now there is no checking on the order but they *should* be processed in order (by clients)
         this.players = {}; //each game has a set of players, indexed by (unique) player name
         do {
             this.id = Math.floor(Math.random() * 10000) + 1000; //make a random game ID
+            this.data = data;
         } while (games.hasOwnProperty(this.id)); //keep looping until we find an unused ID (becuase there's a small chance of a dupe)    
         games[this.id] = this; //store the game we have constructed
     }
@@ -52,17 +53,25 @@ app.post("/*", function (req, res) {
         game = games[msg.gameId];
     }
     if (msg.cmd == "createGame") {
-        game = new Game(games);
+        game = new Game(games, msg.params);
         console.log("Created game ".concat(game.id));
-        player = new Player(msg.name);
-        game.players[msg.name] = player; //place them in the games, players object  
+        res.json({ gameId: game.id });
+        res.status(200); //sendStatus(200)
+        res.end();
+        return;
+        //move out (you should join the game you created)
+        //player =new Player(msg.name)
+        //game.players[msg.name]=player //place them in the games, players object  
         //alter the msg - for output in all the queues
-        msg.cmd = "playerJoined";
-        msg.gameId = game.id;
+        //msg.cmd="playerJoined" 
+        //msg.gameId=game.id
     }
     else if (msg.cmd == "joinGame") {
         //create a new player and add them to the requested game
         player = new Player(msg.name);
+        //send the game setup data (whatever that is... in our case, obstacles)
+        player.q.push({ gameId: game.id, name: "", cmd: "gameData", sqn: game.sqn, params: game.data });
+        game.sqn++;
         //queue a 'virtual' 'playerJoined' message 'from' every player already in the game - for sending to this (joining) player 
         //(so we (the joining players) get to see all the players who have *already* joined)
         for (var pn in game.players) {
